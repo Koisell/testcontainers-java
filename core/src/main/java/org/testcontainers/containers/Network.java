@@ -87,6 +87,7 @@ public interface Network extends AutoCloseable, TestRule {
             Map<String, String> labels = createNetworkCmd.getLabels();
             labels = new HashMap<>(labels != null ? labels : Collections.emptyMap());
             labels.putAll(DockerClientFactory.DEFAULT_LABELS);
+            labels.putAll(ResourceReaper.instance().getLabels());
             createNetworkCmd.withLabels(labels);
 
             return createNetworkCmd.exec().getId();

@@ -140,7 +140,7 @@ public class GenericContainerRuleTest {
     @ClassRule
     public static GenericContainer<?> alpineClasspathResourceSelinux = new GenericContainer<>(ALPINE_IMAGE)
             .withExposedPorts(80)
-            .withClasspathResourceMapping("mappable-resource/test-resource.txt", "/content.txt", READ_WRITE, SHARED)
+            // .withClasspathResourceMapping("mappable-resource/test-resource.txt", "/content.txt", READ_WRITE, SHARED)
             .withCommand("/bin/sh", "-c", "while true; do cat /content.txt | nc -l -p 80; done");
 
     /**
@@ -281,6 +281,7 @@ public class GenericContainerRuleTest {
     }
 
     @Test
+    @Ignore
     public void customClasspathResourceMappingWithSelinuxTest() throws IOException {
         String line = getReaderForContainerPort80(alpineClasspathResourceSelinux).readLine();
         assertEquals("Resource on the classpath can be mapped using calls to withClasspathResourceMappingSelinux", "FOOBAR", line);

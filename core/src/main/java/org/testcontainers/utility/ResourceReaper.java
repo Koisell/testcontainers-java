@@ -66,43 +66,26 @@ public final class ResourceReaper {
         .build();
 
     private static ResourceReaper instance;
-    private final DockerClient dockerClient;
+    private final DockerClient dockerClient = DockerClientFactory.lazyClient();
     private Map<String, String> registeredContainers = new ConcurrentHashMap<>();
     private Set<String> registeredNetworks = Sets.newConcurrentHashSet();
     private Set<String> registeredImages = Sets.newConcurrentHashSet();
     private AtomicBoolean hookIsSet = new AtomicBoolean(false);
 
-    private ResourceReaper() {
-        dockerClient = DockerClientFactory.instance().client();
-    }
+    private final String containerId;
 
-
-    /**
-     *
-     * @deprecated internal API
-     */
-    @Deprecated
-    public static String start(String hostIpAddress, DockerClient client) {
-        return start(client);
-    }
-
-    /**
-     *
-     * @deprecated internal API
-     */
-    @Deprecated
     @SneakyThrows(InterruptedException.class)
-    public static String start(DockerClient client) {
+    public ResourceReaper() {
         String ryukImage = ImageNameSubstitutor.instance()
             .apply(DockerImageName.parse("testcontainers/ryuk:0.3.3"))
             .asCanonicalNameString();
-        DockerClientFactory.instance().checkAndPullImage(client, ryukImage);
+        DockerClientFactory.instance().checkAndPullImage(dockerClient, ryukImage);
 
         List<Bind> binds = new ArrayList<>();
         binds.add(new Bind(DockerClientFactory.instance().getRemoteDockerUnixSocketPath(), new Volume("/var/run/docker.sock")));
 
         ExposedPort ryukExposedPort = ExposedPort.tcp(8080);
-        String ryukContainerId = client.createContainerCmd(ryukImage)
+        containerId = dockerClient.createContainerCmd(ryukImage)
                 .withHostConfig(
                     new HostConfig()
                         .withAutoRemove(true)
@@ -116,11 +99,11 @@ public final class ResourceReaper {
                 .exec()
                 .getId();
 
-        client.startContainerCmd(ryukContainerId).exec();
+        dockerClient.startContainerCmd(containerId).exec();
 
         StringBuilder ryukLog = new StringBuilder();
 
-        ResultCallback.Adapter<Frame> logCallback = client.logContainerCmd(ryukContainerId)
+        ResultCallback.Adapter<Frame> logCallback = dockerClient.logContainerCmd(containerId)
             .withSince(0)
             .withFollowStream(true)
             .withStdOut(true)
@@ -140,7 +123,7 @@ public final class ResourceReaper {
                 .pollInterval(DynamicPollInterval.ofMillis(50))
                 .pollInSameThread()
                 .until(
-                    () -> client.inspectContainerCmd(ryukContainerId).exec(),
+                    () -> dockerClient.inspectContainerCmd(containerId).exec(),
                     inspectContainerResponse -> {
                         return inspectContainerResponse
                             .getNetworkSettings()
@@ -175,7 +158,7 @@ public final class ResourceReaper {
 
         synchronized (DEATH_NOTE) {
             DEATH_NOTE.add(
-                    DockerClientFactory.DEFAULT_LABELS.entrySet().stream()
+                    getLabels().entrySet().stream()
                             .<Map.Entry<String, String>>map(it -> new SimpleEntry<>("label", it.getKey() + "=" + it.getValue()))
                             .collect(Collectors.toList())
             );
@@ -237,8 +220,6 @@ public final class ResourceReaper {
             } catch (IOException ignored) {
             }
         }
-
-        return ryukContainerId;
     }
 
     public synchronized static ResourceReaper instance() {
@@ -449,6 +430,27 @@ public final class ResourceReaper {
             // If the JVM stops without containers being stopped, try and stop the container.
             Runtime.getRuntime().addShutdownHook(new Thread(DockerClientFactory.TESTCONTAINERS_THREAD_GROUP, this::performCleanup));
         }
+    }
+
+    /**
+     *
+     * @deprecated internal API
+     */
+    @Deprecated
+    public Map<String, String> getLabels() {
+        return Collections.singletonMap(
+            DockerClientFactory.TESTCONTAINERS_SESSION_ID_LABEL,
+            DockerClientFactory.SESSION_ID
+        );
+    }
+
+    /**
+     *
+     * @deprecated internal API
+     */
+    @Deprecated
+    public String getContainerId() {
+        return containerId;
     }
 
     static class FilterRegistry {

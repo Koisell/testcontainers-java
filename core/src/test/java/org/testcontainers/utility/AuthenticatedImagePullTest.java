@@ -98,7 +98,7 @@ public class AuthenticatedImagePullTest {
             }, 10, TimeUnit.SECONDS);
         }
 
-        String testRegistryAddress = authenticatedRegistry.getHost() + ":" + port.get();
+        String testRegistryAddress = "127.0.0.1:" + port.get();
         testImageName = testRegistryAddress + "/alpine";
 
         final DockerImageName expectedName = DockerImageName.parse(testImageName);
