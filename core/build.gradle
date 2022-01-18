@@ -40,7 +40,10 @@ tasks.japicmp {
 
     classExcludes = []
 
-    methodExcludes = []
+    methodExcludes = [
+        "org.testcontainers.utility.ResourceReaper#start(java.lang.String,com.github.dockerjava.api.DockerClient)",
+        "org.testcontainers.utility.ResourceReaper#start(com.github.dockerjava.api.DockerClient)"
+    ]
 
     fieldExcludes = []
 }
